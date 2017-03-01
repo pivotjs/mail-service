@@ -4,7 +4,8 @@
   "description": "A mail library",
   "main": "lib/index.js",
   "scripts": {
-    "compile": "tsc"
+    "compile": "tsc",
+    "prepublish": "npm run compile"
   },
   "repository": {
     "type": "git",

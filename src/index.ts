@@ -14,6 +14,7 @@ export interface MailerConfig {
         }
     }
     templatesDir: string;
+    simulation?: boolean;
 }
 
 export interface MailOptions {
@@ -70,13 +71,17 @@ export class Mailer {
         });
 
         return new Promise((resolve, reject) => {
-            this.transporter.sendMail(_mailOptions, (err, info) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(_mailOptions);
-                }
-            });
+            if (this.config.simulation === true) {
+                resolve(_mailOptions);
+            } else {
+                this.transporter.sendMail(_mailOptions, (err, info) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(_mailOptions);
+                    }
+                });
+            }
         });
     }
 }
