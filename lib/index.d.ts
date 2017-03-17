@@ -1,18 +1,7 @@
 /// <reference types="bluebird" />
 import * as nodemailer from 'nodemailer';
 import * as Promise from 'bluebird';
-export interface MailerConfig {
-    transport: {
-        service: string;
-        auth: {
-            user: string;
-            pass: string;
-        };
-    };
-    templatesDir: string;
-    simulation?: boolean;
-}
-export interface MailOptions {
+export interface MailTemplate {
     from?: string;
     subject?: string;
     to?: string | string[];
@@ -24,8 +13,9 @@ export interface MailOptions {
     attachments?: Object[];
 }
 export declare class Mailer {
-    private config;
     private transporter;
-    constructor(config: MailerConfig);
-    sendMailUsingYamlTemplate(templateName: string, languageId: string, mailOptions: MailOptions, templateData: MailOptions): Promise<nodemailer.SendMailOptions>;
+    constructor(transporter: nodemailer.Transporter);
+    loadYamlMailTemplate(filepath: string): nodemailer.SendMailOptions;
+    prepareMail(mailTemplate: MailTemplate, templateData: Object): nodemailer.SendMailOptions;
+    sendMail(mailOptions: nodemailer.SendMailOptions): Promise<nodemailer.SendMailOptions>;
 }

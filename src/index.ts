@@ -5,19 +5,7 @@ import * as yaml from 'js-yaml';
 import * as nodemailer from 'nodemailer';
 import * as Promise from 'bluebird';
 
-export interface MailerConfig {
-    transport: {
-        service: string;
-        auth: {
-            user: string;
-            pass: string;
-        }
-    }
-    templatesDir: string;
-    simulation?: boolean;
-}
-
-export interface MailOptions {
+export interface MailTemplate {
     from?: string;
     subject?: string;
     to?: string | string[];
@@ -30,68 +18,59 @@ export interface MailOptions {
 };
 
 export class Mailer {
-    private config: MailerConfig;
     private transporter: nodemailer.Transporter;
 
-    constructor(config: MailerConfig) {
-        this.config = config;
-        this.transporter = nodemailer.createTransport(config.transport);
+    constructor(transporter: nodemailer.Transporter) {
+        this.transporter = transporter;
     }
 
-    sendMailUsingYamlTemplate(templateName: string, languageId: string, mailOptions: MailOptions, templateData: MailOptions): Promise<nodemailer.SendMailOptions> {
-        const templatesDir = path.join(process.cwd(), this.config.templatesDir);
-        const mailTemplate: nodemailer.SendMailOptions = _.extend(
-            loadMailTemplate(path.join(templatesDir, 'mail.yaml')),
-            loadMailTemplate(path.join(templatesDir, templateName, `${templateName}.yaml`)),
-            loadMailTemplate(path.join(templatesDir, templateName, `${templateName}.${languageId}.yaml`)),
-        );
+    loadYamlMailTemplate(filepath: string): nodemailer.SendMailOptions {
+        if (fs.existsSync(filepath)) {
+            try {
+                return yaml.safeLoad(fs.readFileSync(filepath, 'utf8'));
+            } catch (err) {
+            }
+        }
+        return {} as nodemailer.SendMailOptions;
+    }
 
-        const _mailOptions = _.extend({}, mailOptions);
+    prepareMail(mailTemplate: MailTemplate, templateData: Object): nodemailer.SendMailOptions {
+        const mailOptions: nodemailer.SendMailOptions = _.extend({}, mailTemplate);
 
         _.each(['from', 'subject'], (key) => {
-            if (_.isString(mailTemplate[key])) {
-                _mailOptions[key] = _.template(mailTemplate[key])(templateData);
+            if (_.isString(mailOptions[key])) {
+                mailOptions[key] = _.template(mailOptions[key])(templateData);
             }
         });
 
         _.each(['to', 'cc', 'bcc'], (key) => {
-            if (_.isString(mailTemplate[key])) {
-                _mailOptions[key] = _.template(mailTemplate[key])(templateData);
-            } else if (_.isArray(mailTemplate[key])) {
-                _mailOptions[key] = _.map(mailTemplate[key], (item: string) => {
+            if (_.isString(mailOptions[key])) {
+                mailOptions[key] = _.template(mailOptions[key])(templateData);
+            } else if (_.isArray(mailOptions[key])) {
+                mailOptions[key] = _.map(mailOptions[key], (item: string) => {
                     return _.template(item)(templateData);
                 });
             }
         });
 
         _.each(['text', 'html', 'replyTo'], (key) => {
-            if (_.isString(mailTemplate[key])) {
-                _mailOptions[key] = _.template(mailTemplate[key])(templateData);
+            if (_.isString(mailOptions[key])) {
+                mailOptions[key] = _.template(mailOptions[key])(templateData);
             }
         });
 
+        return mailOptions;
+    }
+
+    sendMail(mailOptions: nodemailer.SendMailOptions): Promise<nodemailer.SendMailOptions> {
         return new Promise((resolve, reject) => {
-            if (this.config.simulation === true) {
-                resolve(_mailOptions);
-            } else {
-                this.transporter.sendMail(_mailOptions, (err, info) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve(_mailOptions);
-                    }
-                });
-            }
+            this.transporter.sendMail(mailOptions, (err, info) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(mailOptions);
+                }
+            });
         });
     }
-}
-
-function loadMailTemplate(filepath): nodemailer.SendMailOptions {
-    if (fs.existsSync(filepath)) {
-        try {
-            return yaml.safeLoad(fs.readFileSync(filepath, 'utf8'));
-        } catch (err) {
-        }
-    }
-    return {} as nodemailer.SendMailOptions;
 }
